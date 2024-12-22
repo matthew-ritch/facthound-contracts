@@ -9,6 +9,12 @@ contract QuestionFactory {
     uint8 public asker_fee_per_10000;
     mapping(bytes32 => address) public getQuestion;
 
+    event QuestionCreated(
+        address indexed _asker,
+        bytes32 indexed _questionHash,
+        uint _bounty
+    );
+
     constructor(address _oracle, uint8 _asker_fee_per_10000) {
         owner = msg.sender;
         oracle = _oracle;
@@ -16,7 +22,7 @@ contract QuestionFactory {
     }
 
     /**
-     * @notice Creates a new question. 
+     * @notice Creates a new question.
      * @param questionHash is the keccak256 hash of string(askerAddress-questionString)
      */
     function createQuestion(bytes32 questionHash) external payable {
@@ -27,9 +33,15 @@ contract QuestionFactory {
         // pass it the bounty less fees
         uint bounty_before_fees = msg.value;
         uint fee = (bounty_before_fees / 10000) * asker_fee_per_10000;
-        questionAddress.transfer(bounty_before_fees - fee); // reverts if the sent bounty does not cover gas
+        questionAddress.transfer(bounty_before_fees - fee);
         // add it to the getQuestion map
         getQuestion[questionHash] = questionAddress;
+        //
+        emit QuestionCreated(
+            msg.sender,
+            questionHash,
+            bounty_before_fees - fee
+        );
     }
 
     /**

@@ -7,12 +7,28 @@ contract Question {
     address public asker;
     bytes32 public questionHash;
     bytes32 public selectedAnswer;
-    bool public isCertified;
     bool public askerSelectionRejected;
+    bool public isCertified;
+    bool public isResolved;
 
     mapping(bytes32 => address payable) public answerInfoMap; // answerHash -> answerer address
 
-    constructor(address _owner, address _oracle, address _asker, bytes32 _questionHash) {
+    event AnswerCreated(address indexed _answerer, bytes32 indexed _answerHash);
+
+    event AnswerSelected(bytes32 indexed _answerHash);
+
+    event AnswerCertified(bytes32 indexed _answerHash);
+
+    event AnswerRejected(bytes32 indexed _answerHash);
+
+    event AnswerRedeemed(bytes32 indexed _answerHash);
+
+    constructor(
+        address _owner,
+        address _oracle,
+        address _asker,
+        bytes32 _questionHash
+    ) {
         owner = _owner;
         oracle = _oracle;
         asker = _asker;
@@ -30,6 +46,8 @@ contract Question {
         require(answerInfoMap[answerHash] == address(0));
         // add answerHash and msg.sender to answerInfoMap
         answerInfoMap[answerHash] = payable(msg.sender);
+        //
+        emit AnswerCreated(msg.sender, answerHash);
     }
 
     /**
@@ -46,6 +64,8 @@ contract Question {
         require(answerInfoMap[answerHash] != address(0));
         // set selectedAnswer to answerHash
         selectedAnswer = answerHash;
+        //
+        emit AnswerSelected(answerHash);
     }
 
     /**
@@ -57,6 +77,8 @@ contract Question {
         // ensure selectedAnswer is nonzero
         require(selectedAnswer != 0);
         isCertified = true;
+        //
+        emit AnswerCertified(selectedAnswer);
     }
 
     /**
@@ -67,36 +89,34 @@ contract Question {
         require(msg.sender == oracle);
         isCertified = false;
         askerSelectionRejected = true;
+        //
+        emit AnswerRejected(selectedAnswer);
     }
 
     /**
      * @notice trigger payout to the selected answerer.
      * restricted to owner
      */
-    function redeemBounty(uint estimatedGas) public {
+    function redeemBounty() public {
         require(msg.sender == owner);
         // ensure selectedAnswer is nonzero
         require(selectedAnswer != 0);
         // ensure isCertified is true
         require(isCertified);
-        //TODO add upvote payout logic here
-
         // pay out bounty to selectedAnswer
-        //TODO look at reference contracts to see how they estimate gas. probably use web3.py to do it
-        answerInfoMap[selectedAnswer].transfer(
-            address(this).balance - estimatedGas
-        );
+        answerInfoMap[selectedAnswer].transfer(address(this).balance);
+        isResolved = true;
+        //
+        emit AnswerRedeemed(selectedAnswer);
     }
 
     /**
      * @notice cancel this question. return bounty to answer
      * restricted to owner
      */
-    function cancel(uint estimatedGas) public {
+    function cancel() public {
         require(msg.sender == owner);
-        // return bounty to aasker
-        payable(asker).transfer(
-            address(this).balance - estimatedGas
-        );
+        // return bounty to asker
+        payable(asker).transfer(address(this).balance);
     }
 }
