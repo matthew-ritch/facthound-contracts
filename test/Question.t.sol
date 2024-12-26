@@ -527,7 +527,7 @@ contract QuestionTestCancel is Test {
         // cancel question
         vm.prank(owner);
         question.cancel();
-        // 
+        //
         assert(question.isCancelled());
     }
 
@@ -562,7 +562,7 @@ contract QuestionTestCancel is Test {
         // cancel question
         vm.prank(owner);
         question.cancel();
-        // 
+        //
         assert(question.isCancelled());
         assertEq(asker.balance, 1);
         assertEq(answerer1.balance, 0);
@@ -591,7 +591,6 @@ contract QuestionTestCancel is Test {
         question.cancel();
     }
 }
-
 
 contract QuestionTestNothingAfterCancel is Test {
     Question public question;
@@ -677,5 +676,4 @@ contract QuestionTestNothingAfterCancel is Test {
         vm.prank(owner);
         question.cancel();
     }
-
 }
