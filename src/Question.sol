@@ -21,21 +21,21 @@ contract Question {
     event AnswerRejected(bytes32 indexed _answerHash);
     event AnswerRedeemed(bytes32 indexed _answerHash);
 
-    modifier onlyOwner {
+    modifier onlyOwner() {
         require(msg.sender == owner);
         _;
     }
 
-    modifier onlyOracle {
+    modifier onlyOracle() {
         require(msg.sender == oracle);
         _;
     }
 
-    modifier notResolved {
+    modifier notResolved() {
         require(!isResolved);
         _;
     }
-    modifier notCancelled {
+    modifier notCancelled() {
         require(!isCancelled);
         _;
     }
@@ -45,7 +45,7 @@ contract Question {
         address _oracle,
         address _asker,
         bytes32 _questionHash
-    ) {
+    ) payable {
         owner = _owner;
         oracle = _oracle;
         asker = _asker;
@@ -58,7 +58,7 @@ contract Question {
     /**
      * @notice Creates a new answer for this question. answerHash is keccak256(abi.encodePacked(answererAddress, answerString));
      */
-    function createAnswer(bytes32 answerHash) notCancelled public {
+    function createAnswer(bytes32 answerHash) public notCancelled {
         // if answerHash already exists revert. check answerInfoMap
         require(answerInfoMap[answerHash] == address(0));
         // add answerHash and msg.sender to answerInfoMap
@@ -70,7 +70,7 @@ contract Question {
     /**
      * @notice selects the answer to be certified by the oracle
      */
-    function selectAnswer(bytes32 answerHash) notCancelled notResolved public {
+    function selectAnswer(bytes32 answerHash) public notCancelled notResolved {
         // allows either the asker or the oracle to select an answer, unless the asker's selection has already been rejected.
         if (askerSelectionRejected) {
             require(msg.sender == oracle);
@@ -78,7 +78,10 @@ contract Question {
             require((msg.sender == oracle) || (msg.sender == asker));
         }
         // if answerHash does not exist revert. check answerInfoMap
-        require(answerInfoMap[answerHash] != address(0), "Answer not in answerInfoMap");
+        require(
+            answerInfoMap[answerHash] != address(0),
+            "Answer not in answerInfoMap"
+        );
         // set selectedAnswer to answerHash
         selectedAnswer = answerHash;
         //
@@ -89,7 +92,7 @@ contract Question {
      * @notice certifies the selected answer. enable payout trigger
      * restricted to oracle.
      */
-    function certifyAnswer() onlyOracle notCancelled notResolved public {
+    function certifyAnswer() public onlyOracle notCancelled notResolved {
         // ensure selectedAnswer is nonzero
         require(selectedAnswer != 0);
         //
@@ -102,7 +105,7 @@ contract Question {
      * @notice reject the selected answer. disable payout trigger.
      * restricted to oracle.
      */
-    function rejectAnswer() onlyOracle notCancelled notResolved public {
+    function rejectAnswer() public onlyOracle notCancelled notResolved {
         // ensure selectedAnswer is nonzero
         require(selectedAnswer != 0);
         //
@@ -116,7 +119,7 @@ contract Question {
      * @notice trigger payout to the selected answerer.
      * restricted to owner
      */
-    function redeemBounty() onlyOwner notCancelled notResolved public {
+    function redeemBounty() public onlyOwner notCancelled notResolved {
         // ensure selectedAnswer is nonzero
         require(selectedAnswer != 0);
         // ensure isCertified is true
@@ -132,7 +135,7 @@ contract Question {
      * @notice cancel this question. return bounty to answer
      * restricted to owner
      */
-    function cancel() onlyOwner notCancelled notResolved public {
+    function cancel() public onlyOwner notCancelled notResolved {
         // set to cancelled
         isCancelled = true;
         // return bounty to asker

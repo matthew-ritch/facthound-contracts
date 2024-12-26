@@ -23,17 +23,31 @@ contract QuestionFactory {
 
     /**
      * @notice Creates a new question.
-     * @param questionHash is the keccak256 hash of string(askerAddress-questionString)
+     * @param questionHash is keccak256(abi.encodePacked(askerAddress, questionString));
      */
     function createQuestion(bytes32 questionHash) external payable {
+        require(
+            getQuestion[questionHash] == address(0),
+            "Question Already Exists"
+        );
+        // calculate bounty fees
+        uint bounty_before_fees = msg.value;
+        uint fee = (bounty_before_fees / 10000) * asker_fee_per_10000; //rounds down
         // create question
         address payable questionAddress = payable(
-            address(new Question(owner, oracle, msg.sender, questionHash))
+            address(
+                (new Question){value: bounty_before_fees - fee}(
+                    owner,
+                    oracle,
+                    msg.sender,
+                    questionHash
+                )
+            )
         );
-        // pass it the bounty less fees
-        uint bounty_before_fees = msg.value;
-        uint fee = (bounty_before_fees / 10000) * asker_fee_per_10000;
-        questionAddress.transfer(bounty_before_fees - fee);
+        require(
+            questionAddress.balance == bounty_before_fees - fee,
+            "Bounty setup failed."
+        );
         // add it to the getQuestion map
         getQuestion[questionHash] = questionAddress;
         //
