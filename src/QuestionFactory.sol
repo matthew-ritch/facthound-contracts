@@ -6,7 +6,7 @@ import "./Question.sol";
 contract QuestionFactory {
     address public owner;
     address public oracle;
-    uint8 public asker_fee_per_10000;
+    uint16 public asker_fee_per_10000;
     mapping(bytes32 => address) public getQuestion;
 
     event QuestionCreated(
@@ -15,7 +15,7 @@ contract QuestionFactory {
         uint _bounty
     );
 
-    constructor(address _oracle, uint8 _asker_fee_per_10000) {
+    constructor(address _oracle, uint16 _asker_fee_per_10000) {
         owner = msg.sender;
         oracle = _oracle;
         asker_fee_per_10000 = _asker_fee_per_10000;
@@ -64,7 +64,16 @@ contract QuestionFactory {
      * @param _owner The new owner of the factory
      */
     function setOwner(address _owner) external {
-        require(msg.sender == owner);
+        require(msg.sender == owner, "Not authorized");
         owner = _owner;
+    }
+
+    /**
+     * @notice Withdraws funds
+     * @dev Must be called by the current owner
+     */
+    function widthdraw() external {
+        require(msg.sender == owner, "Not authorized");
+        payable(msg.sender).transfer(address(this).balance);
     }
 }

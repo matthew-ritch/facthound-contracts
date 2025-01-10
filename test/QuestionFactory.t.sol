@@ -9,7 +9,7 @@ contract QuestionFactoryTestCreateQuestion is Test {
     QuestionFactory public questionFactory;
     address public owner;
     address public oracle;
-    uint8 public asker_fee_per_10000;
+    uint16 public asker_fee_per_10000;
     uint bounty;
     address asker;
     address answerer;
@@ -65,7 +65,7 @@ contract QuestionFactoryTestSetOwner is Test {
     address public owner;
     address public newOwner;
     address public oracle;
-    uint8 public asker_fee_per_10000;
+    uint16 public asker_fee_per_10000;
     uint bounty;
     address asker;
     address answerer;
