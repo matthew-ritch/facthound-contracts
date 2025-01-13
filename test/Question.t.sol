@@ -159,8 +159,8 @@ contract QuestionTestSelectAnswer is Test {
         // oracle certifies
         vm.prank(oracle);
         question.certifyAnswer();
-        // owner pays out
-        vm.prank(owner);
+        // oracle pays out
+        vm.prank(oracle);
         question.redeemBounty();
         // ensure revert
         vm.expectRevert();
@@ -253,8 +253,8 @@ contract QuestionTestCertifyAnswer is Test {
         // oracle certifies
         vm.prank(oracle);
         question.certifyAnswer();
-        // owner pays out
-        vm.prank(owner);
+        // oracle pays out
+        vm.prank(oracle);
         question.redeemBounty();
         //
         vm.expectRevert();
@@ -346,8 +346,8 @@ contract QuestionTestRejectAnswer is Test {
         // oracle certifies
         vm.prank(oracle);
         question.certifyAnswer();
-        // owner pays out
-        vm.prank(owner);
+        // oracle pays out
+        vm.prank(oracle);
         question.redeemBounty();
         // ensure revert
         vm.expectRevert();
@@ -406,10 +406,13 @@ contract QuestionTestRedeemBounty is Test {
         question.createAnswer(answerHash2);
     }
 
-    function testRedeemBountyRevertsIfNotOwner() public {
+    function testRedeemBountyRevertsIfNotOracle() public {
         // asker selects an answer
         vm.prank(asker);
         question.selectAnswer(answerHash2);
+        // oracle certifies
+        vm.prank(oracle);
+        question.certifyAnswer();
         // ensure reverts
         vm.expectRevert();
         vm.prank(asker);
@@ -424,14 +427,14 @@ contract QuestionTestRedeemBounty is Test {
         question.redeemBounty();
         //
         vm.expectRevert();
-        vm.prank(oracle);
+        vm.prank(owner);
         question.redeemBounty();
     }
 
     function testRedeemBountyRevertsIfAnswerNotSelected() public {
         assertEq(question.selectedAnswer(), 0);
         vm.expectRevert();
-        vm.prank(owner);
+        vm.prank(oracle);
         question.redeemBounty();
     }
 
@@ -442,7 +445,7 @@ contract QuestionTestRedeemBounty is Test {
         // ensure revert
         assert(!question.isCertified());
         vm.expectRevert();
-        vm.prank(owner);
+        vm.prank(oracle);
         question.redeemBounty();
     }
 
@@ -453,13 +456,13 @@ contract QuestionTestRedeemBounty is Test {
         // oracle certifies
         vm.prank(oracle);
         question.certifyAnswer();
-        // owner pays out
-        vm.prank(owner);
+        // oracle pays out
+        vm.prank(oracle);
         question.redeemBounty();
         // ensure revert
         assert(question.isResolved());
         vm.expectRevert();
-        vm.prank(owner);
+        vm.prank(oracle);
         question.redeemBounty();
     }
 
@@ -472,9 +475,101 @@ contract QuestionTestRedeemBounty is Test {
         question.certifyAnswer();
         // set answerer2's balance to 0
         vm.deal(answerer2, 0);
-        // owner pays out
-        vm.prank(owner);
+        // oracle pays out
+        vm.prank(oracle);
         question.redeemBounty();
+        // make sure they were paid out
+        assertEq(answerer2.balance, 1);
+    }
+}
+
+contract QuestionTestCertifyAndRedeemAnswer is Test {
+    Question public question;
+    address owner;
+    address oracle;
+    address asker;
+    address answerer1;
+    address answerer2;
+    bytes32 questionHash;
+    bytes32 answerHash1;
+    bytes32 answerHash2;
+
+    function setUp() public {
+        owner = vm.addr(1);
+        oracle = vm.addr(2);
+        asker = vm.addr(3);
+        answerer1 = vm.addr(4);
+        answerer2 = vm.addr(5);
+        // question is asked
+        questionHash = keccak256(abi.encodePacked(asker, "Is this a test?"));
+        question = new Question(owner, oracle, asker, questionHash);
+        // send the question some eth
+        vm.deal(address(question), 1);
+        // question is answered by two different answerers
+        answerHash1 = keccak256(
+            abi.encodePacked(answerer1, "No, this is not a test.")
+        );
+        vm.prank(answerer1);
+        question.createAnswer(answerHash1);
+        answerHash2 = keccak256(
+            abi.encodePacked(answerer2, "Yes, this is a test.")
+        );
+        vm.prank(answerer2);
+        question.createAnswer(answerHash2);
+    }
+
+    function testCertifyAndRedeemAnswerRevertsIfNotOracle() public {
+        // asker selects an answer
+        vm.prank(asker);
+        question.selectAnswer(answerHash2);
+        // ensure reverts
+        vm.expectRevert();
+        vm.prank(asker);
+        question.certifyAndRedeemAnswer();
+        //
+        vm.expectRevert();
+        vm.prank(answerer1);
+        question.certifyAndRedeemAnswer();
+        //
+        vm.expectRevert();
+        vm.prank(answerer2);
+        question.certifyAndRedeemAnswer();
+        //
+        vm.expectRevert();
+        vm.prank(owner);
+        question.certifyAndRedeemAnswer();
+    }
+
+    function testCertifyAndRedeemAnswerRevertsIfAnswerNotSelected() public {
+        assertEq(question.selectedAnswer(), 0);
+        vm.expectRevert();
+        vm.prank(oracle);
+        question.certifyAndRedeemAnswer();
+    }
+
+    function testCertifyAndRedeemAnswerRevertsIfQuestionResolved() public {
+        // asker selects an answer
+        vm.prank(asker);
+        question.selectAnswer(answerHash2);
+        // oracle certifies and pays out
+        vm.prank(oracle);
+        question.certifyAndRedeemAnswer();
+        // ensure revert
+        assert(question.isResolved());
+        vm.expectRevert();
+        vm.prank(oracle);
+        question.certifyAndRedeemAnswer();
+    }
+
+    function testCertifyAndRedeemAnswerReturnsTheBountyToAsker() public {
+        // asker selects an answer
+        vm.prank(asker);
+        question.selectAnswer(answerHash2);
+        // set answerer2's balance to 0
+        vm.deal(answerer2, 0);
+        // oracle certifies and pays out
+        vm.prank(oracle);
+        question.certifyAndRedeemAnswer();
         // make sure they were paid out
         assertEq(answerer2.balance, 1);
     }
@@ -538,8 +633,8 @@ contract QuestionTestCancel is Test {
         // oracle certifies
         vm.prank(oracle);
         question.certifyAnswer();
-        // owner pays out
-        vm.prank(owner);
+        // oracle pays out
+        vm.prank(oracle);
         question.redeemBounty();
         // ensure revert
         assert(question.isResolved());

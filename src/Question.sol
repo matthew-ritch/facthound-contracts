@@ -88,17 +88,38 @@ contract Question {
         emit AnswerSelected(answerHash);
     }
 
-    /**
-     * @notice certifies the selected answer. enable payout trigger
-     * restricted to oracle.
-     */
-    function certifyAnswer() public onlyOracle notCancelled notResolved {
+    function _certifyAnswer() internal onlyOracle notCancelled notResolved {
         // ensure selectedAnswer is nonzero
         require(selectedAnswer != 0);
         //
         isCertified = true;
         //
         emit AnswerCertified(selectedAnswer);
+    }
+
+    /**
+     * @notice certifies the selected answer. enables payout trigger
+     * restricted to oracle.
+     */
+    function certifyAnswer() public onlyOracle notCancelled notResolved {
+        _certifyAnswer();
+    }
+
+    /**
+     * @notice trigger payout to the selected answerer.
+     * restricted to oracle
+     * enabled by _certifyAnswer
+     */
+    function _redeemBounty() internal onlyOracle notCancelled notResolved {
+        // ensure selectedAnswer is nonzero
+        require(selectedAnswer != 0);
+        // ensure isCertified is true
+        require(isCertified);
+        // pay out bounty to selectedAnswer
+        answerInfoMap[selectedAnswer].transfer(address(this).balance);
+        isResolved = true;
+        //
+        emit AnswerRedeemed(selectedAnswer);
     }
 
     /**
@@ -117,19 +138,23 @@ contract Question {
 
     /**
      * @notice trigger payout to the selected answerer.
-     * restricted to owner
+     * restricted to oracle
+     * enabled by certifyAnswer
      */
-    function redeemBounty() public onlyOwner notCancelled notResolved {
-        // ensure selectedAnswer is nonzero
-        require(selectedAnswer != 0);
-        // ensure isCertified is true
-        require(isCertified);
-        // pay out bounty to selectedAnswer
-        answerInfoMap[selectedAnswer].transfer(address(this).balance);
-        isResolved = true;
-        //
-        emit AnswerRedeemed(selectedAnswer);
+    function redeemBounty() public onlyOracle notCancelled notResolved {
+        _redeemBounty();
     }
+
+    /**
+     * @notice trigger payout to the selected answerer.
+     * restricted to oracle
+     * enabled by certifyAnswer
+     */
+    function certifyAndRedeemAnswer() public onlyOracle notCancelled notResolved {
+        _certifyAnswer();
+        _redeemBounty();
+    }
+
 
     /**
      * @notice cancel this question. return bounty to answer
