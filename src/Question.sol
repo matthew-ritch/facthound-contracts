@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 // TODO add not cancelled checks
 pragma solidity ^0.8.13;
 
