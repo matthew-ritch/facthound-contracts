@@ -11,7 +11,7 @@ contract QuestionFactory {
 
     event QuestionCreated(
         address indexed _asker,
-        bytes32 indexed _questionHash,
+        address indexed _questionAddress,
         uint _bounty
     );
 
@@ -53,7 +53,7 @@ contract QuestionFactory {
         //
         emit QuestionCreated(
             msg.sender,
-            questionHash,
+            questionAddress,
             bounty_before_fees - fee
         );
     }
