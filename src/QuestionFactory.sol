@@ -72,7 +72,7 @@ contract QuestionFactory {
      * @notice Withdraws funds
      * @dev Must be called by the current owner
      */
-    function widthdraw() external {
+    function withdraw() external {
         require(msg.sender == owner, "Not authorized");
         payable(msg.sender).transfer(address(this).balance);
     }
