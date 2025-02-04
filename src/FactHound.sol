@@ -4,14 +4,25 @@ pragma solidity ^0.8.13;
 /// @title FactHound
 /// @notice A decentralized Q&A platform with oracle verification
 contract FactHound {
+    // --- Custom Errors ---
+    error NotOwner();
+    error NotOracle();
+    error QuestionResolved();
+    error QuestionCancelled();
+    error QuestionExists();
+    error AnswerExists();
+    error AnswerNotExists();
+    error NotAuthorized();
+    error NoAnswerSelected();
+    error InvalidOwner();
+    error NoFeesToWithdraw();
+
     // --- State Variables ---
-    // Administrative
     address public owner;
-    address public oracle;
-    uint16 public asker_fee_per_10000;
+    address public immutable oracle;
+    uint16 public immutable asker_fee_per_10000;
     
-    // Financial tracking
-    uint public total_bounty;
+    uint256 public total_bounty;
 
     // --- Enums ---
     enum QuestionStatus {
@@ -25,7 +36,7 @@ contract FactHound {
     // --- Structs ---
     struct Question {
         address asker;
-        uint bounty;
+        uint128 bounty; // reduced from uint256 to save gas
         bytes32 selectedAnswer;
         QuestionStatus status;
         mapping(bytes32 => address payable) answerMap; // answerHash -> answerer address
@@ -60,22 +71,22 @@ contract FactHound {
 
     // --- Modifiers ---
     modifier onlyOwner() {
-        require(msg.sender == owner, "FactHound: caller is not owner");
+        if (msg.sender != owner) revert NotOwner();
         _;
     }
 
     modifier onlyOracle() {
-        require(msg.sender == oracle, "FactHound: caller is not oracle");
+        if (msg.sender != oracle) revert NotOracle();
         _;
     }
 
     modifier notResolved(bytes32 questionHash) {
-        require(getQuestion[questionHash].status != QuestionStatus.RESOLVED, "FactHound: question already resolved");
+        if (getQuestion[questionHash].status == QuestionStatus.RESOLVED) revert QuestionResolved();
         _;
     }
 
     modifier notCancelled(bytes32 questionHash) {
-        require(getQuestion[questionHash].status != QuestionStatus.CANCELLED, "FactHound: question is cancelled");
+        if (getQuestion[questionHash].status == QuestionStatus.CANCELLED) revert QuestionCancelled();
         _;
     }
 
@@ -84,7 +95,6 @@ contract FactHound {
         owner = msg.sender;
         oracle = _oracle;
         asker_fee_per_10000 = _asker_fee_per_10000;
-        total_bounty = 0;
     }
 
     // --- External/Public Functions ---
@@ -94,23 +104,23 @@ contract FactHound {
      * @param questionHash is keccak256(abi.encodePacked(askerAddress, questionString));
      */
     function createQuestion(bytes32 questionHash) external payable {
-        require(
-            getQuestion[questionHash].asker == address(0),
-            "Question Already Exists"
-        );
+        if (getQuestion[questionHash].asker != address(0)) revert QuestionExists();
+        
         // calculate bounty fees
-        uint fee = (msg.value / 10000) * asker_fee_per_10000; //rounds down
-        uint bounty = msg.value - fee;
-        // create question
+        uint256 fee;
+        uint256 bounty;
+        unchecked {
+            fee = (msg.value * asker_fee_per_10000) / 10000;
+            bounty = msg.value - fee;
+            total_bounty += bounty;
+        }
+
         Question storage question = getQuestion[questionHash];
         question.asker = msg.sender;
-        question.bounty = bounty;
-        question.selectedAnswer = 0;
+        question.bounty = uint128(bounty);
         question.status = QuestionStatus.OPEN;
-        //
+
         emit QuestionCreated(msg.sender, questionHash, bounty);
-        //
-        total_bounty += bounty;
     }
 
     /**
@@ -121,13 +131,11 @@ contract FactHound {
     function createAnswer(
         bytes32 questionHash,
         bytes32 answerHash
-    ) public notCancelled(questionHash) {
-        require(
-            getQuestion[questionHash].answerMap[answerHash] == address(0),
-            "FactHound: answer already exists"
-        );
+    ) external notCancelled(questionHash) {
+        Question storage question = getQuestion[questionHash];
+        if (question.answerMap[answerHash] != address(0)) revert AnswerExists();
         
-        getQuestion[questionHash].answerMap[answerHash] = payable(msg.sender);
+        question.answerMap[answerHash] = payable(msg.sender);
         emit AnswerCreated(msg.sender, questionHash, answerHash);
     }
 
@@ -137,27 +145,18 @@ contract FactHound {
     function selectAnswer(
         bytes32 questionHash,
         bytes32 answerHash
-    ) public notCancelled(questionHash) {
+    ) external notCancelled(questionHash) {
         Question storage question = getQuestion[questionHash];
-        // check if answer exists
-        require(
-            question.answerMap[answerHash] != address(0),
-            "Answer does not exist"
-        );
-        // check if caller is oracle or asker (if answer not previously rejected)
+        if (question.answerMap[answerHash] == address(0)) revert AnswerNotExists();
+        
         if (question.status == QuestionStatus.REJECTED) {
-            require(
-                msg.sender == oracle,
-                "Only oracle can select after rejection"
-            );
+            if (msg.sender != oracle) revert NotAuthorized();
         } else {
-            require(
-                msg.sender == oracle || msg.sender == question.asker,
-                "Not authorized"
-            );
+            if (msg.sender != oracle && msg.sender != question.asker) revert NotAuthorized();
         }
+        
         question.selectedAnswer = answerHash;
-        //
+        question.status = QuestionStatus.SELECTED;
         emit AnswerSelected(questionHash, answerHash);
     }
 
@@ -166,16 +165,20 @@ contract FactHound {
      */
     function redeemAnswer(
         bytes32 questionHash
-    ) public onlyOracle notCancelled(questionHash) notResolved(questionHash) {
+    ) external onlyOracle notCancelled(questionHash) notResolved(questionHash) {
         Question storage question = getQuestion[questionHash];
-        require(question.selectedAnswer != 0, "No answer selected");
+        bytes32 selectedAnswer = question.selectedAnswer;
+        if (selectedAnswer == 0) revert NoAnswerSelected();
+
+        uint256 bounty = question.bounty;
+        unchecked {
+            total_bounty -= bounty;
+        }
+        
         question.status = QuestionStatus.RESOLVED;
-        // transfer bounty to answerer
-        address payable answerer = question.answerMap[question.selectedAnswer];
-        total_bounty -= question.bounty;
-        answerer.transfer(question.bounty);
-        //
-        emit AnswerRedeemed(questionHash, question.selectedAnswer);
+        question.answerMap[selectedAnswer].transfer(bounty);
+        
+        emit AnswerRedeemed(questionHash, selectedAnswer);
     }
 
     /**
@@ -183,7 +186,7 @@ contract FactHound {
      */
     function rejectAnswer(
         bytes32 questionHash
-    ) public onlyOracle notCancelled(questionHash) notResolved(questionHash) {
+    ) external onlyOracle notCancelled(questionHash) notResolved(questionHash) {
         Question storage question = getQuestion[questionHash];
         require(question.selectedAnswer != 0, "No answer selected");
         question.status = QuestionStatus.REJECTED; // mark as rejected
@@ -196,7 +199,7 @@ contract FactHound {
      */
     function cancelQuestion(
         bytes32 questionHash
-    ) public onlyOwner notCancelled(questionHash) notResolved(questionHash) {
+    ) external onlyOwner notCancelled(questionHash) notResolved(questionHash) {
         Question storage question = getQuestion[questionHash];
         question.status = QuestionStatus.CANCELLED; // mark as cancelled
         total_bounty -= question.bounty;
@@ -210,7 +213,7 @@ contract FactHound {
      * @param _owner The new owner address
      */
     function setOwner(address _owner) external onlyOwner {
-        require(_owner != address(0), "FactHound: invalid owner address");
+        if (_owner == address(0)) revert InvalidOwner();
         owner = _owner;
     }
 
@@ -218,8 +221,11 @@ contract FactHound {
      * @notice Withdraws accumulated fees from the contract
      */
     function withdraw() external onlyOwner {
-        uint256 withdrawAmount = address(this).balance - total_bounty;
-        require(withdrawAmount > 0, "FactHound: no fees to withdraw");
+        uint256 withdrawAmount;
+        unchecked {
+            withdrawAmount = address(this).balance - total_bounty;
+        }
+        if (withdrawAmount == 0) revert NoFeesToWithdraw();
         payable(msg.sender).transfer(withdrawAmount);
     }
 }

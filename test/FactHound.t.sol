@@ -50,7 +50,7 @@ contract FactHoundTestCreateQuestion is Test {
         vm.prank(asker);
         factHound.createQuestion{value: 1 ether}(questionHash);
 
-        vm.expectRevert("Question Already Exists");
+        vm.expectRevert(FactHound.QuestionExists.selector);
         vm.prank(asker);
         factHound.createQuestion{value: 1 ether}(questionHash);
     }
@@ -103,7 +103,7 @@ contract FactHoundTestCreateAnswer is Test {
         vm.prank(answerer1);
         factHound.createAnswer(questionHash, answerHash1);
 
-        vm.expectRevert("FactHound: answer already exists");
+        vm.expectRevert(FactHound.AnswerExists.selector);
         vm.prank(answerer1);
         factHound.createAnswer(questionHash, answerHash1);
     }
@@ -161,7 +161,7 @@ contract FactHoundTestSelectAnswer is Test {
     }
 
     function testSelectAnswerRevertsIfNotAskerOrOracle() public {
-        vm.expectRevert("Not authorized");
+        vm.expectRevert(FactHound.NotAuthorized.selector);
         vm.prank(answerer1);
         factHound.selectAnswer(questionHash, answerHash2);
     }
@@ -212,7 +212,7 @@ contract FactHoundTestRedeemAnswer is Test {
     }
 
     function testRedeemAnswerRevertsIfNotOracle() public {
-        vm.expectRevert("FactHound: caller is not oracle");
+        vm.expectRevert(FactHound.NotOracle.selector);
         vm.prank(asker);
         factHound.redeemAnswer(questionHash);
     }
@@ -261,7 +261,7 @@ contract FactHoundTestRejectAnswer is Test {
     }
 
     function testRejectAnswerRevertsIfNotOracle() public {
-        vm.expectRevert("FactHound: caller is not oracle");
+        vm.expectRevert(FactHound.NotOracle.selector);
         vm.prank(asker);
         factHound.rejectAnswer(questionHash);
     }
@@ -301,7 +301,7 @@ contract FactHoundTestCancelQuestion is Test {
     }
 
     function testCancelQuestionRevertsIfNotOwner() public {
-        vm.expectRevert("FactHound: caller is not owner");
+        vm.expectRevert(FactHound.NotOwner.selector);
         vm.prank(asker);
         factHound.cancelQuestion(questionHash);
     }
@@ -330,7 +330,7 @@ contract FactHoundTestAdministrative is Test {
     }
 
     function testSetOwnerRevertsIfNotOwner() public {
-        vm.expectRevert("FactHound: caller is not owner");
+        vm.expectRevert(FactHound.NotOwner.selector);
         vm.prank(newOwner);
         factHound.setOwner(newOwner);
     }
@@ -343,7 +343,7 @@ contract FactHoundTestAdministrative is Test {
     }
 
     function testWithdrawRevertsIfNotOwner() public {
-        vm.expectRevert("FactHound: caller is not owner");
+        vm.expectRevert(FactHound.NotOwner.selector);
         vm.prank(newOwner);
         factHound.withdraw();
     }
