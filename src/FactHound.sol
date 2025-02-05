@@ -36,7 +36,7 @@ contract FactHound {
     // --- Structs ---
     struct Question {
         address asker;
-        uint128 bounty; // reduced from uint256 to save gas
+        uint128 bounty;
         bytes32 selectedAnswer;
         QuestionStatus status;
     }
@@ -203,6 +203,14 @@ contract FactHound {
         question.status = QuestionStatus.CANCELLED; // mark as cancelled
         total_bounty -= question.bounty;
         payable(question.asker).transfer(question.bounty);
+    }
+
+    // --- View Functions ---
+    function getAnswererAddress(
+        bytes32 questionHash,
+        bytes32 answerHash
+    ) external view returns (address) {
+        return getAnswerer[questionHash][answerHash];
     }
 
     // --- Administrative Functions ---
