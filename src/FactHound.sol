@@ -39,11 +39,11 @@ contract FactHound {
         uint128 bounty; // reduced from uint256 to save gas
         bytes32 selectedAnswer;
         QuestionStatus status;
-        mapping(bytes32 => address payable) answerMap; // answerHash -> answerer address
     }
 
     // --- Mappings ---
     mapping(bytes32 => Question) public getQuestion; // questionHash -> Question
+    mapping(bytes32 => mapping(bytes32 => address payable)) public getAnswerer; // questionHash -> (answerHash -> answerer)
 
     // --- Events ---
     event QuestionCreated(
@@ -132,10 +132,9 @@ contract FactHound {
         bytes32 questionHash,
         bytes32 answerHash
     ) external notCancelled(questionHash) {
-        Question storage question = getQuestion[questionHash];
-        if (question.answerMap[answerHash] != address(0)) revert AnswerExists();
+        if (getAnswerer[questionHash][answerHash] != address(0)) revert AnswerExists();
         
-        question.answerMap[answerHash] = payable(msg.sender);
+        getAnswerer[questionHash][answerHash] = payable(msg.sender);
         emit AnswerCreated(msg.sender, questionHash, answerHash);
     }
 
@@ -147,7 +146,7 @@ contract FactHound {
         bytes32 answerHash
     ) external notCancelled(questionHash) {
         Question storage question = getQuestion[questionHash];
-        if (question.answerMap[answerHash] == address(0)) revert AnswerNotExists();
+        if (getAnswerer[questionHash][answerHash] == address(0)) revert AnswerNotExists();
         
         if (question.status == QuestionStatus.REJECTED) {
             if (msg.sender != oracle) revert NotAuthorized();
@@ -176,7 +175,7 @@ contract FactHound {
         }
         
         question.status = QuestionStatus.RESOLVED;
-        question.answerMap[selectedAnswer].transfer(bounty);
+        getAnswerer[questionHash][selectedAnswer].transfer(bounty);
         
         emit AnswerRedeemed(questionHash, selectedAnswer);
     }
