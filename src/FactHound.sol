@@ -2,7 +2,7 @@
 pragma solidity ^0.8.13;
 
 /// @title FactHound
-/// @notice A decentralized Q&A platform with oracle verification
+/// @notice A decentralized information bounty platform
 contract FactHound {
     // --- Custom Errors ---
     error NotOwner();
