@@ -363,7 +363,7 @@ contract FactHoundTestMultipleQuestions is Test {
     function setUp() public {
         owner = vm.addr(1);
         oracle = vm.addr(2);
-        numQuestions = 5;
+        numQuestions = 1005;
         asker_fee_per_10000 = 100;
 
         // Setup multiple askers and answerers
