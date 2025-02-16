@@ -7,7 +7,7 @@ import {FactHound} from "../src/FactHound.sol";
 contract FactHoundTestCreateQuestion is Test {
     FactHound public factHound;
     address public owner;
-    address public oracle;
+
     address public asker;
     address public answerer;
     uint16 public asker_fee_per_10000;
@@ -16,12 +16,12 @@ contract FactHoundTestCreateQuestion is Test {
 
     function setUp() public {
         owner = vm.addr(1);
-        oracle = vm.addr(2);
+
         asker = vm.addr(3);
         answerer = vm.addr(4);
         asker_fee_per_10000 = 100;
         vm.prank(owner);
-        factHound = new FactHound(oracle, asker_fee_per_10000);
+        factHound = new FactHound(asker_fee_per_10000);
     }
 
     function testCreateQuestion() public {
@@ -59,7 +59,7 @@ contract FactHoundTestCreateQuestion is Test {
 contract FactHoundTestCreateAnswer is Test {
     FactHound public factHound;
     address public owner;
-    address public oracle;
+
     address public asker;
     address public answerer1;
     address public answerer2;
@@ -67,13 +67,13 @@ contract FactHoundTestCreateAnswer is Test {
 
     function setUp() public {
         owner = vm.addr(1);
-        oracle = vm.addr(2);
+
         asker = vm.addr(3);
         answerer1 = vm.addr(4);
         answerer2 = vm.addr(5);
 
         vm.prank(owner);
-        factHound = new FactHound(oracle, 100);
+        factHound = new FactHound(100);
 
         // Create question
         questionHash = keccak256(abi.encodePacked(asker, "Is this a test?"));
@@ -112,7 +112,6 @@ contract FactHoundTestCreateAnswer is Test {
 contract FactHoundTestSelectAnswer is Test {
     FactHound public factHound;
     address public owner;
-    address public oracle;
     address public asker;
     address public answerer1;
     address public answerer2;
@@ -122,13 +121,12 @@ contract FactHoundTestSelectAnswer is Test {
 
     function setUp() public {
         owner = vm.addr(1);
-        oracle = vm.addr(2);
         asker = vm.addr(3);
         answerer1 = vm.addr(4);
         answerer2 = vm.addr(5);
 
         vm.prank(owner);
-        factHound = new FactHound(oracle, 100);
+        factHound = new FactHound(100);
 
         // Create question and answers
         questionHash = keccak256(abi.encodePacked(asker, "Is this a test?"));
@@ -152,15 +150,7 @@ contract FactHoundTestSelectAnswer is Test {
         assertEq(selectedAnswer, answerHash2);
     }
 
-    function testSelectAnswerOracle() public {
-        vm.prank(oracle);
-        factHound.selectAnswer(questionHash, answerHash1);
-
-        (, , bytes32 selectedAnswer, ) = factHound.getQuestion(questionHash);
-        assertEq(selectedAnswer, answerHash1);
-    }
-
-    function testSelectAnswerRevertsIfNotAskerOrOracle() public {
+    function testSelectAnswerRevertsIfNotAsker() public {
         vm.expectRevert(FactHound.NotAuthorized.selector);
         vm.prank(answerer1);
         factHound.selectAnswer(questionHash, answerHash2);
@@ -170,7 +160,6 @@ contract FactHoundTestSelectAnswer is Test {
 contract FactHoundTestRedeemAnswer is Test {
     FactHound public factHound;
     address public owner;
-    address public oracle;
     address public asker;
     address public answerer;
     bytes32 questionHash;
@@ -178,12 +167,12 @@ contract FactHoundTestRedeemAnswer is Test {
 
     function setUp() public {
         owner = vm.addr(1);
-        oracle = vm.addr(2);
+
         asker = vm.addr(3);
         answerer = vm.addr(4);
 
         vm.prank(owner);
-        factHound = new FactHound(oracle, 100);
+        factHound = new FactHound(100);
 
         // Setup question and answer
         questionHash = keccak256(abi.encodePacked(asker, "Is this a test?"));
@@ -194,15 +183,12 @@ contract FactHoundTestRedeemAnswer is Test {
         answerHash = keccak256(abi.encodePacked(answerer, "Yes"));
         vm.prank(answerer);
         factHound.createAnswer(questionHash, answerHash);
-
-        vm.prank(asker);
-        factHound.selectAnswer(questionHash, answerHash);
     }
 
     function testRedeemAnswer() public {
         uint initialBalance = answerer.balance;
-        vm.prank(oracle);
-        factHound.redeemAnswer(questionHash);
+        vm.prank(asker);
+        factHound.selectAnswer(questionHash, answerHash);
 
         assertEq(answerer.balance - initialBalance, 0.99 ether);
         (, , , FactHound.QuestionStatus status) = factHound.getQuestion(
@@ -210,77 +196,19 @@ contract FactHoundTestRedeemAnswer is Test {
         );
         assertEq(uint(status), uint(FactHound.QuestionStatus.RESOLVED));
     }
-
-    function testRedeemAnswerRevertsIfNotOracle() public {
-        vm.expectRevert(FactHound.NotOracle.selector);
-        vm.prank(asker);
-        factHound.redeemAnswer(questionHash);
-    }
-}
-
-contract FactHoundTestRejectAnswer is Test {
-    FactHound public factHound;
-    address public owner;
-    address public oracle;
-    address public asker;
-    address public answerer;
-    bytes32 questionHash;
-    bytes32 answerHash;
-
-    function setUp() public {
-        owner = vm.addr(1);
-        oracle = vm.addr(2);
-        asker = vm.addr(3);
-        answerer = vm.addr(4);
-
-        vm.prank(owner);
-        factHound = new FactHound(oracle, 100);
-
-        // Setup question and answer
-        questionHash = keccak256(abi.encodePacked(asker, "Is this a test?"));
-        vm.deal(asker, 1 ether);
-        vm.prank(asker);
-        factHound.createQuestion{value: 1 ether}(questionHash);
-
-        answerHash = keccak256(abi.encodePacked(answerer, "Yes"));
-        vm.prank(answerer);
-        factHound.createAnswer(questionHash, answerHash);
-
-        vm.prank(asker);
-        factHound.selectAnswer(questionHash, answerHash);
-    }
-
-    function testRejectAnswer() public {
-        vm.prank(oracle);
-        factHound.rejectAnswer(questionHash);
-
-        (, , , FactHound.QuestionStatus status) = factHound.getQuestion(
-            questionHash
-        );
-        assertEq(uint(status), uint(FactHound.QuestionStatus.REJECTED));
-    }
-
-    function testRejectAnswerRevertsIfNotOracle() public {
-        vm.expectRevert(FactHound.NotOracle.selector);
-        vm.prank(asker);
-        factHound.rejectAnswer(questionHash);
-    }
 }
 
 contract FactHoundTestCancelQuestion is Test {
     FactHound public factHound;
     address public owner;
-    address public oracle;
     address public asker;
     bytes32 questionHash;
 
     function setUp() public {
         owner = vm.addr(1);
-        oracle = vm.addr(2);
         asker = vm.addr(3);
-
         vm.prank(owner);
-        factHound = new FactHound(oracle, 100);
+        factHound = new FactHound(100);
 
         questionHash = keccak256(abi.encodePacked(asker, "Is this a test?"));
         vm.deal(asker, 1 ether);
@@ -301,7 +229,7 @@ contract FactHoundTestCancelQuestion is Test {
     }
 
     function testCancelQuestionRevertsIfNotOwner() public {
-        vm.expectRevert(FactHound.NotOwner.selector);
+        vm.expectRevert(FactHound.NotAuthorized.selector);
         vm.prank(asker);
         factHound.cancelQuestion(questionHash);
     }
@@ -311,15 +239,12 @@ contract FactHoundTestAdministrative is Test {
     FactHound public factHound;
     address public owner;
     address public newOwner;
-    address public oracle;
 
     function setUp() public {
         owner = vm.addr(1);
         newOwner = vm.addr(2);
-        oracle = vm.addr(3);
-
         vm.prank(owner);
-        factHound = new FactHound(oracle, 100);
+        factHound = new FactHound(100);
         vm.deal(address(factHound), 1 ether);
     }
 
@@ -330,7 +255,7 @@ contract FactHoundTestAdministrative is Test {
     }
 
     function testSetOwnerRevertsIfNotOwner() public {
-        vm.expectRevert(FactHound.NotOwner.selector);
+        vm.expectRevert(FactHound.NotAuthorized.selector);
         vm.prank(newOwner);
         factHound.setOwner(newOwner);
     }
@@ -343,7 +268,7 @@ contract FactHoundTestAdministrative is Test {
     }
 
     function testWithdrawRevertsIfNotOwner() public {
-        vm.expectRevert(FactHound.NotOwner.selector);
+        vm.expectRevert(FactHound.NotAuthorized.selector);
         vm.prank(newOwner);
         factHound.withdraw();
     }
@@ -352,7 +277,6 @@ contract FactHoundTestAdministrative is Test {
 contract FactHoundTestMultipleQuestions is Test {
     FactHound public factHound;
     address public owner;
-    address public oracle;
     address[] public askers;
     address[] public answerers;
     bytes32[] public questionHashes;
@@ -362,7 +286,7 @@ contract FactHoundTestMultipleQuestions is Test {
 
     function setUp() public {
         owner = vm.addr(1);
-        oracle = vm.addr(2);
+
         numQuestions = 1005;
         asker_fee_per_10000 = 100;
 
@@ -375,7 +299,7 @@ contract FactHoundTestMultipleQuestions is Test {
         }
 
         vm.prank(owner);
-        factHound = new FactHound(oracle, asker_fee_per_10000);
+        factHound = new FactHound(asker_fee_per_10000);
 
         // Create multiple questions
         questionHashes = new bytes32[](numQuestions);
@@ -447,25 +371,20 @@ contract FactHoundTestMultipleQuestions is Test {
 
         // Resolve questions in different states
         for (uint i = 0; i < numQuestions; i++) {
-            vm.prank(askers[i]);
-            factHound.selectAnswer(questionHashes[i], answerHashes[i][0]);
-
             if (i % 3 == 0) {
-                // Redeem answer
-                vm.prank(oracle);
-                factHound.redeemAnswer(questionHashes[i]);
+                // Select/Redeem answer
+                vm.prank(askers[i]);
+                factHound.selectAnswer(questionHashes[i], answerHashes[i][0]);
                 (, , , FactHound.QuestionStatus status) = factHound.getQuestion(
                     questionHashes[i]
                 );
                 assertEq(uint(status), uint(FactHound.QuestionStatus.RESOLVED));
             } else if (i % 3 == 1) {
-                // Reject answer
-                vm.prank(oracle);
-                factHound.rejectAnswer(questionHashes[i]);
+                // Don't select/redeem answer
                 (, , , FactHound.QuestionStatus status) = factHound.getQuestion(
                     questionHashes[i]
                 );
-                assertEq(uint(status), uint(FactHound.QuestionStatus.REJECTED));
+                assertEq(uint(status), uint(FactHound.QuestionStatus.OPEN));
             } else {
                 // Cancel question
                 vm.prank(owner);
@@ -495,22 +414,20 @@ contract FactHoundTestMultipleQuestions is Test {
             vm.prank(answerers[i]);
             factHound.createAnswer(questionHashes[i], answerHash);
 
-            vm.prank(askers[i]);
-            factHound.selectAnswer(questionHashes[i], answerHash);
-
-            if (i % 2 == 0) {
-                vm.prank(oracle);
-                factHound.redeemAnswer(questionHashes[i]);
-            } else {
-                vm.prank(oracle);
-                factHound.rejectAnswer(questionHashes[i]);
+            if (i % 3 == 0) {
+                vm.prank(askers[i]);
+                factHound.selectAnswer(questionHashes[i], answerHash);
+            } else if (i % 3 == 1) {
+                vm.prank(owner);
+                factHound.cancelQuestion(questionHashes[i]);
             }
         }
 
         uint finalTotalBounty = factHound.total_bounty();
         assertEq(
             finalTotalBounty,
-            initialTotalBounty - (0.99 ether * (1 + (numQuestions / 2)))
+            initialTotalBounty -
+                (0.99 ether * ((numQuestions % 3) + 2 * (numQuestions / 3)))
         );
     }
 }
