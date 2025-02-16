@@ -15,6 +15,3 @@ contract FactHoundScript is Script {
         vm.stopBroadcast();
     }
 }
-
-    
-
