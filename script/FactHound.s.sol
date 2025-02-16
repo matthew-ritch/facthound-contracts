@@ -11,7 +11,7 @@ contract FactHoundScript is Script {
         uint256 deployerPrivateKey = vm.envUint("WALLET_KEY");
         uint16 feePer10000 = 200;
         vm.startBroadcast(deployerPrivateKey);
-        FactHound facthound = new FactHound(feePer10000);
+        new FactHound(feePer10000);
         vm.stopBroadcast();
     }
 }
