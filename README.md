@@ -28,7 +28,7 @@ Facthound is an information bounty system where users ask questions and post opt
 ## This Repo
 
 This repository contains Facthound's smart contract. It can be deployed on any EVM blockchain, but I currently have it running on Base.
-[Here](https://sepolia.basescan.org/address/0x3557b420eb48ec804ed4923eedb74763b0c45235#code) is the live contract.
+[Here](https://basescan.org/address/0x6f639b39606936f8dfb82322781c913170b66f4f) is the live contract.
 This repo is set up to use [Foundry](https://github.com/foundry-rs/foundry). 
 
 ## Contract Details
